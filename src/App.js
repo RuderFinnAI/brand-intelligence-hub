@@ -6,93 +6,15 @@ import {
 } from 'lucide-react';
 import { Chart } from 'chart.js/auto';
 
-// Firebase Imports
-import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, setLogLevel } from "firebase/firestore";
+// --- UPDATED: Import from our new firebase.js file ---
+import { auth, db, onAuthStateChanged, signInAnonymously } from './firebase'; 
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
-// --- Firebase Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-// --- Firebase Initialization ---
-let app, auth, db;
-try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    // setLogLevel('debug'); 
-} catch (e) {
-    console.error("Firebase initialization error:", e);
-}
+const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
 
 // Custom Social Icons
 const RedditIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="currentColor" className="text-orange-500 h-6 w-6 mr-3"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-12h2v2h-2v-2zm-2 4c0-1.1.9-2 2-2s2 .9 2 2v2c0 1.1-.9 2-2 2s-2-.9-2-2v-2zm-3.17-2.83c.39-.39 1.02-.39 1.41 0l1.41 1.41c.39.39.39 1.02 0 1.41-.39.39-1.02.39-1.41 0l-1.41-1.41c-.39-.39-.39-1.02 0-1.41zm8.34 0c.39-.39 1.02-.39 1.41 0l1.41 1.41c.39.39.39 1.02 0 1.41-.39.39-1.02.39-1.41 0l-1.41-1.41c-.39-.39-.39-1.02 0-1.41zM12 16c-1.66 0-3-1.34-3-3h6c0 1.66-1.34 3-3 3z"></path></svg> );
 const InstagramIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 mr-3 text-pink-500"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg> );
-
-
-// Mock search results for demonstration
-const mockSearchResults = {
-    summary: "Recent discussions around 'Samsung SmartThings' focus on the launch of their new Matter 1.4 integration, praised for its interoperability. However, some users have raised concerns about the complexity of the new Routine Creation Assistant. The company's focus on AI-driven home automation is clear.",
-    sentiment: {
-        positive: { value: 70, summary: "Users are excited about Matter 1.4 support and the deeper integration with Samsung Health for sleep tracking." },
-        negative: { value: 20, summary: "Some users find the new app update confusing and report issues with device statuses not updating in real-time." },
-        neutral: { value: 10, summary: "Neutral discussion is mainly focused on technical questions about API integration and feature comparisons to Google Home and Apple HomeKit." }
-    },
-    themes: ["Matter 1.4 Integration", "AI Routine Creation", "Samsung Health Sleep Sync", "App UI/UX", "Device Status Bugs"],
-    articles: [
-        { title: "Samsung brings Matter 1.4, Samsung Health integration to SmartThings", source: "SamMobile", url: "https://www.sammobile.com/news/samsung-smartthings-matter-1-4-health-integration/", summary: "Samsung has announced a significant update to its SmartThings platform, introducing support for the Matter 1.4 standard and deeper integration with Samsung Health." },
-        { title: "Samsung Announces Latest SmartThings Update", source: "Samsung Newsroom", url: "https://news.samsung.com/global/samsung-announces-latest-smartthings-update", summary: "The latest update aims to enhance the AI Home experience with features focused on sleep wellness and expanded device compatibility." },
-    ],
-    social_discussions: [
-        { platform: "Reddit", title: "r/SmartThings - TV, Soundbars and related devices no reporting status", summary: "A user reports that their Samsung TVs and soundbars are not reporting their on/off status correctly in the app, despite troubleshooting.", url: "https://www.reddit.com/r/SmartThings/" },
-        { platform: "YouTube", title: "SmartThings: The new AI features are... interesting", summary: "A tech reviewer walks through the new AI Routine Creation assistant, praising its power but noting a steep learning curve for new users.", url: "https://www.youtube.com/results?search_query=samsung+smartthings" },
-    ],
-    linkedin_snapshot: { 
-        employee_count: "270,000+", 
-        hiring_trend: "stable", 
-        key_executives: [
-            { name: "JH Han", title: "Vice Chairman & CEO" },
-            { name: "Jaeyeon Jung", title: "EVP & Head of SmartThings" }
-        ]
-    },
-    stock_info: { 
-        name: "Samsung Electronics Co Ltd",
-        ticker: "005930.KS", 
-        price: "82,600 KRW", 
-        change_percent: 0.49, 
-        summary: "Stock remains stable with slight positive movement, reflecting market confidence in its diverse electronics portfolio.",
-        historical_data: [
-            { date: "2024-01-01", price: 79600 },
-            { date: "2024-02-01", price: 72800 },
-            { date: "2024-03-01", price: 82400 },
-            { date: "2024-04-01", price: 75200 },
-            { date: "2024-05-01", price: 78300 },
-            { date: "2024-06-01", price: 81500 },
-            { date: "2024-07-01", price: 82600 },
-        ]
-    },
-    competitors: [
-        { name: "Google Home", summary: "Strong competitor with deep integration into the Android ecosystem and Google Assistant." },
-        { name: "Apple HomeKit", summary: "Known for its focus on security, privacy, and seamless integration with Apple devices." }
-    ],
-    pr_insights: {
-        swot_analysis: {
-            strengths: ["Strong hardware ecosystem", "Early adoption of Matter standard", "High brand recognition and trust"],
-            weaknesses: ["App complexity can be a barrier for new users", "Fragmented user experience across different device generations"],
-            opportunities: ["Promote AI-driven energy savings to eco-conscious consumers", "Position as the central hub for all smart home devices, not just Samsung's"],
-            threats: ["Aggressive pricing and simplicity of competitors like Google Home", "Growing concerns over data privacy in smart homes"]
-        },
-        key_media_contacts: {
-            external: [{ name: "Jennifer Pattison Tuohy", outlet: "The Verge", beat: "Smart homes, IoT, Matter standard", url: "https://www.theverge.com/authors/jennifer-pattison-tuohy" }],
-            internal: [{ name: "Corporate Communications", outlet: "Samsung Newsroom", beat: "Official press releases and media inquiries", url: "https://news.samsung.com/" }]
-        },
-        suggested_story_angles: [
-            "Pitch an exclusive on how SmartThings' AI is helping families reduce their energy bills.",
-            "Offer a byline from Jaeyeon Jung on the future of the truly interoperable smart home.",
-        ]
-    }
-};
 
 const App = () => {
     const [brandName, setBrandName] = useState('Samsung');
@@ -100,8 +22,8 @@ const App = () => {
     const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [apiKey, setApiKey] = useState('');
-    const [isKeySaved, setIsKeySaved] = useState(false);
+    const [apiKey, setApiKey] = useState(process.env.REACT_APP_GEMINI_API_KEY || '');
+    const [isKeySaved, setIsKeySaved] = useState(!!process.env.REACT_APP_GEMINI_API_KEY);
     const [isKeyLoading, setIsKeyLoading] = useState(true);
     const [userId, setUserId] = useState(null);
     const [visibleArticles, setVisibleArticles] = useState(7);
@@ -109,32 +31,37 @@ const App = () => {
     const [currentBrandAnalyzed, setCurrentBrandAnalyzed] = useState('');
 
     useEffect(() => {
-        if (!auth) return;
+        if (!auth) {
+            console.warn("Firebase not initialized. Running in offline mode.");
+            setIsKeyLoading(false);
+            return;
+        };
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid);
-                try {
-                    const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/secrets/api`);
-                    const docSnap = await getDoc(userDocRef);
-                    if (docSnap.exists() && docSnap.data().key) {
-                        setApiKey(docSnap.data().key);
-                        setIsKeySaved(true);
-                    }
-                } catch (e) { console.error("Error fetching API key:", e); } 
-                finally { setIsKeyLoading(false); }
+                if (!process.env.REACT_APP_GEMINI_API_KEY) {
+                    try {
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/secrets/api`);
+                        const docSnap = await getDoc(userDocRef);
+                        if (docSnap.exists() && docSnap.data().key) {
+                            setApiKey(docSnap.data().key);
+                            setIsKeySaved(true);
+                        }
+                    } catch (e) { console.error("Error fetching API key:", e); } 
+                }
+                setIsKeyLoading(false);
             } else {
-                const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                try {
-                    if (initialToken) await signInWithCustomToken(auth, initialToken);
-                    else await signInAnonymously(auth);
-                } catch (e) { console.error("Sign-in error:", e); setIsKeyLoading(false); }
+                signInAnonymously(auth).catch(e => {
+                    console.error("Anonymous sign-in error:", e);
+                    setIsKeyLoading(false);
+                });
             }
         });
         return () => unsubscribe();
     }, []);
 
     const handleSaveApiKey = async () => {
-        if (!apiKey || !userId) return;
+        if (!apiKey || !userId || !db) return;
         setIsLoading(true);
         try {
             const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/secrets/api`);
@@ -165,10 +92,10 @@ const App = () => {
         }
     }, [apiKey]);
 
-    const handleAnalyze = useCallback(async (brandToAnalyze, refinement) => {
+     const handleAnalyze = useCallback(async (brandToAnalyze, refinement) => {
         const currentBrand = brandToAnalyze || brandName;
         if (!currentBrand || !apiKey) {
-            setError(!apiKey ? "Please save your API key first." : "Please enter a brand name.");
+            setError(!apiKey ? "Please provide an API key." : "Please enter a brand name.");
             return;
         }
         setIsLoading(true);
@@ -243,12 +170,12 @@ const App = () => {
             setAnalysis(parsedAnalysis);
 
         } catch (e) {
-            setError(`Analysis failed. Using mock data. Error: ${e.message}`);
-            setAnalysis(mockSearchResults);
+            setError(`Analysis failed. Please try again. Error: ${e.message}`);
         } finally {
             setIsLoading(false);
         }
     }, [apiKey, brandName, callGeminiAPI]);
+
 
     const handleCompetitorClick = (competitorName) => {
         setBrandName(competitorName);
